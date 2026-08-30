@@ -123,4 +123,17 @@ To prevent Mermaid syntax rendering errors in generated markdown documents, all 
    - Mermaid flowchart `style` directives must target concrete node IDs (e.g., `style NodeId fill:#...`), not `subgraph` identifiers. Use `classDef` or direct node styling.
 5. **No Special Symbols in Node IDs**:
    - Node IDs must be clean alphanumeric/underscore strings (e.g., `K_VIP`, `HashCalc`, `Triton_Worker`), avoiding hyphens, spaces, or dots in the ID itself.
+6. **Dark-Mode Optimized High-Contrast Color Palette**:
+   - Never use light pastel fills (`#ffcccc`, `#dae8fc`, `#d5e8d4`) without explicit text color, as white default text in dark mode becomes invisible.
+   - Always specify explicit dark card backgrounds (`fill:#1e293b`), vibrant colored borders (`stroke:#...`), and bright white/light text (`color:#f8fafc`):
+
+| Purpose / Category | Background (`fill`) | Border (`stroke`) | Text (`color`) | Example Style |
+| :--- | :--- | :--- | :--- | :--- |
+| **Primary / Data / Infra** | `#1e293b` (Slate) | `#38bdf8` (Sky Blue) | `#f8fafc` (White) | `style Node fill:#1e293b,stroke:#38bdf8,stroke-width:2px,color:#f8fafc` |
+| **Success / Resilience** | `#064e3b` (Emerald) | `#34d399` (Mint) | `#ecfdf5` (Light Mint) | `style Node fill:#064e3b,stroke:#34d399,stroke-width:2px,color:#ecfdf5` |
+| **Danger / Bottleneck** | `#450a0a` (Crimson) | `#f87171` (Coral) | `#fef2f2` (Light Coral)| `style Node fill:#450a0a,stroke:#f87171,stroke-width:2px,color:#fef2f2` |
+| **Innovation / Dedupe** | `#3b0764` (Violet) | `#c084fc` (Purple) | `#faf5ff` (Lavender) | `style Node fill:#3b0764,stroke:#c084fc,stroke-width:2px,color:#faf5ff` |
+| **Warning / Flow Skip** | `#451a03` (Amber) | `#fbbf24` (Gold) | `#fffbeb` (Cream) | `style Node fill:#451a03,stroke:#fbbf24,stroke-width:2px,color:#fffbeb` |
+| **Muted / Background** | `#1e293b` (Slate) | `#64748b` (Slate Border)| `#94a3b8` (Muted Gray)| `style Node fill:#1e293b,stroke:#64748b,stroke-width:1.5px,color:#94a3b8` |
+
 

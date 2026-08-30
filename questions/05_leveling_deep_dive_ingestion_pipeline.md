@@ -34,9 +34,10 @@ flowchart LR
         API -->|"1 vector at a time"| VDB
     end
 
-    style API fill:#ffcccc,stroke:#cc0000,stroke-width:2px
-    style C fill:#fff2cc,stroke:#d6b656,stroke-width:1px
-    style VDB fill:#dae8fc,stroke:#6c8ebf,stroke-width:1px
+    style K fill:#1e293b,stroke:#38bdf8,stroke-width:2px,color:#f8fafc
+    style C fill:#451a03,stroke:#fbbf24,stroke-width:2px,color:#fffbeb
+    style API fill:#450a0a,stroke:#f87171,stroke-width:2px,color:#fef2f2
+    style VDB fill:#1e293b,stroke:#38bdf8,stroke-width:2px,color:#f8fafc
 ```
 
 ---
@@ -60,10 +61,14 @@ flowchart TD
         Flink -.->|"State Checkpointing"| CP[("RocksDB State Store")]
     end
 
-    style MB fill:#d5e8d4,stroke:#82b366,stroke-width:2px
-    style DLQ fill:#f8cecc,stroke:#b85450,stroke-width:2px
-    style CP fill:#dae8fc,stroke:#6c8ebf,stroke-width:1px
-    style VDB fill:#dae8fc,stroke:#6c8ebf,stroke-width:1px
+    style K fill:#1e293b,stroke:#38bdf8,stroke-width:2px,color:#f8fafc
+    style Flink fill:#064e3b,stroke:#34d399,stroke-width:2px,color:#ecfdf5
+    style MB fill:#064e3b,stroke:#34d399,stroke-width:2px,color:#ecfdf5
+    style Worker fill:#1e293b,stroke:#38bdf8,stroke-width:2px,color:#f8fafc
+    style VDB fill:#1e293b,stroke:#38bdf8,stroke-width:2px,color:#f8fafc
+    style Retry fill:#451a03,stroke:#fbbf24,stroke-width:2px,color:#fffbeb
+    style DLQ fill:#450a0a,stroke:#f87171,stroke-width:2px,color:#fef2f2
+    style CP fill:#1e293b,stroke:#38bdf8,stroke-width:2px,color:#f8fafc
 ```
 
 ---
@@ -111,13 +116,16 @@ flowchart TD
     Triton --> V_Shadow
     Skip --> Iceberg
 
-    style HashCalc fill:#e1d5e7,stroke:#9673a6,stroke-width:1px
-    style CacheLookup fill:#e1d5e7,stroke:#9673a6,stroke-width:2px
-    style Skip fill:#fff2cc,stroke:#d6b656,stroke-width:2px
-    style Controller fill:#d5e8d4,stroke:#82b366,stroke-width:2px
-    style Triton fill:#dae8fc,stroke:#6c8ebf,stroke-width:2px
-    style V_Active fill:#dae8fc,stroke:#6c8ebf,stroke-width:1px
-    style V_Shadow fill:#dae8fc,stroke:#6c8ebf,stroke-width:1px
+    style K_VIP fill:#1e293b,stroke:#38bdf8,stroke-width:2px,color:#f8fafc
+    style K_Bulk fill:#1e293b,stroke:#64748b,stroke-width:1.5px,color:#94a3b8
+    style HashCalc fill:#3b0764,stroke:#c084fc,stroke-width:2px,color:#faf5ff
+    style CacheLookup fill:#3b0764,stroke:#c084fc,stroke-width:2px,color:#faf5ff
+    style Skip fill:#451a03,stroke:#fbbf24,stroke-width:2px,color:#fffbeb
+    style Controller fill:#064e3b,stroke:#34d399,stroke-width:2px,color:#ecfdf5
+    style Triton fill:#1e293b,stroke:#38bdf8,stroke-width:2px,color:#f8fafc
+    style V_Active fill:#1e293b,stroke:#38bdf8,stroke-width:2px,color:#f8fafc
+    style V_Shadow fill:#1e293b,stroke:#38bdf8,stroke-width:2px,color:#f8fafc
+    style Iceberg fill:#1e293b,stroke:#38bdf8,stroke-width:2px,color:#f8fafc
 ```
 
 ---

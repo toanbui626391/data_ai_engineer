@@ -87,26 +87,21 @@ This module contains 4 enterprise system design scenarios. Each scenario is desi
 * **Problem**: An AI Data Analyst Agent is deployed for business users to query data via natural language. The LLM cannot fit 800 table DDLs into its context window, and raw DDLs lack business definitions (e.g., "What is Net Churn Revenue?").
 
 ### 2. Architecture Blueprint
-```
-                              [Natural Language User Query]
-                                            │
-                                            ▼
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│                              Semantic Discovery Engine                                 │
-│  1. Vector search over Table & Column Semantic Catalog (dbt docs / Iceberg tags)       │
-│  2. Prunes 800 tables $\to$ Top 3-5 relevant tables + Foreign Key graph joins          │
-│  3. Injects Golden SQL queries (few-shot examples) from vector repository              │
-└────────────────────────────────────────────────────────────────────────────────────────┘
-                                            │
-                                            ▼
-                             [LLM SQL Generation Agent]
-                                            │
-                                            ▼
-┌────────────────────────────────────────────────────────────────────────────────────────┐
-│                            Guardrail & Execution Sandbox                               │
-│  - AST SQL Parser (Disallow DROP/ALTER; enforce warehouse partition pruning & LIMIT)  │
-│  - Read-Only Warehouse Role with Strict Timeout & Slot Quotas                          │
-└────────────────────────────────────────────────────────────────────────────────────────┘
+
+```mermaid
+flowchart TD
+    Q["Natural Language User Query"] --> DISC
+    
+    subgraph DISC ["1. Semantic Discovery Engine"]
+        D1["• Vector search over semantic catalog (dbt/Iceberg)<br/>• Prunes 800 tables → Top 3-5 + FK joins<br/>• Injects Golden SQL few-shot examples"]
+    end
+    
+    DISC --> LLM["2. LLM SQL Generation Agent"]
+    LLM --> GUARD
+    
+    subgraph GUARD ["3. Guardrail & Execution Sandbox"]
+        G1["• AST SQL Parser (Disallow DROP/ALTER; enforce LIMIT)<br/>• Read-Only Warehouse Role (Timeout & Quota limits)"]
+    end
 ```
 
 ### 3. Senior vs. Staff Leveling Matrix

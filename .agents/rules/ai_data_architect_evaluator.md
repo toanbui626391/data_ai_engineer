@@ -136,4 +136,28 @@ To prevent Mermaid syntax rendering errors in generated markdown documents, all 
 | **Warning / Flow Skip** | `#451a03` (Amber) | `#fbbf24` (Gold) | `#fffbeb` (Cream) | `style Node fill:#451a03,stroke:#fbbf24,stroke-width:2px,color:#fffbeb` |
 | **Muted / Background** | `#1e293b` (Slate) | `#64748b` (Slate Border)| `#94a3b8` (Muted Gray)| `style Node fill:#1e293b,stroke:#64748b,stroke-width:1.5px,color:#94a3b8` |
 
+---
 
+## 8. Small-Screen & E-Ink Readability Guidelines (BOOX Tab Mini & Mobile Optimization)
+
+To ensure all architectural design documents, interview question banks, and technical rubrics render cleanly on compact displays (e.g., **7.8" E-Ink displays like BOOX Tab Mini**, mobile readers, tablets, and e-reader apps like NeoReader, KOReader, Obsidian, or Notion), adhere to the following formatting constraints:
+
+### 1. Horizontal Width & Table Constraints
+* **Limit Line Length in ASCII / Code Blocks**: Keep line lengths in ASCII art boxes and code snippets within **70–80 characters maximum** to prevent horizontal scrollbars or word-wrapping distortion on 7.8" screens.
+* **Avoid Wide Tables (Max 2–3 Columns)**:
+  * Do NOT create wide 4+ column tables, as columns will compress into unreadable vertical slivers on portrait screens.
+  * Prefer compact 2-column or 3-column tables (e.g., `Dimension | Details` or `Level | Approach | Impact`).
+  * If comparing 4+ dimensions, convert the comparison into structured **bulleted card blocks** or **definition lists** instead of a single giant table.
+
+### 2. Vertical Flow for Mermaid Architecture Diagrams
+* **Always Use Vertical Layouts (`flowchart TD` or `sequenceDiagram`)**:
+  * Never use wide horizontal layouts (`flowchart LR`) for large end-to-end architectures, as they force e-reader renderers to shrink the diagram down to illegibly tiny text.
+  * Stack subgraphs vertically so the document scrolls naturally down the page.
+* **Keep Node Labels Narrow**:
+  * Use `<br/>` aggressively to break node text into 2–3 words per line (e.g., `Node["Ingestion Gateway<br/>(Delta Cursor Checkpoint)"]`).
+
+### 3. Typography, Chunking & E-Ink Visual Structure
+* **Bite-Sized Paragraphs**: Keep text blocks to **2–4 sentences maximum**. Long walls of text cause visual fatigue on E-Ink refresh cycles.
+* **Strict Heading Hierarchy (`#` $\to$ `##` $\to$ `###`)**: Maintain consistent Markdown header levels to allow e-reader native Table of Contents (TOC) sidebars to build clickable navigation trees.
+* **Bold Lead-Ins on Bullet Points**: Always start list items with bold conceptual labels (e.g., `* **Root Cause:** Explanation...`) to enable fast visual skimming and pagination.
+* **High Contrast & Minimal Visual Noise**: Avoid subtle pastel colors or low-contrast gray-on-gray text. Ensure all diagrams and text maintain razor-sharp contrast readable under both front-light and ambient natural lighting.

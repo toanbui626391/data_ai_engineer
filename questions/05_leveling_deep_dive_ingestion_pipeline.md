@@ -19,7 +19,7 @@ This document provides a comprehensive architectural analysis and visual compari
 * **Failure Modes**: Network saturation, severe consumer lag, 429 HTTP rate-limit errors, and memory crashes during traffic bursts.
 
 ```mermaid
-flowchart LR
+flowchart TD
     subgraph Sources ["15,000 events/sec"]
         K["Kafka Ingestion Topic"]
     end
@@ -132,35 +132,49 @@ flowchart TD
 
 ## 3. Comprehensive Leveling Comparison Matrix
 
-| Engineering Dimension | L4: Mid-Level Engineer | L5: Senior Engineer | L6: Staff Engineer |
-| :--- | :--- | :--- | :--- |
-| **Pipeline Calling Pattern** | 1-by-1 synchronous HTTP calls. | Micro-batches (128–256 docs per request). | Dynamic micro-batching + connection pooling + asynchronous I/O. |
-| **Redundant Update Handling** | Re-embeds every single update blindly. | Re-embeds every update in batches. | **Content-Hash Deduplication Gate**:<br>Calculates `SHA-256(text)`; skips GPU embedding if text is unchanged (saves ~80% GPU cost). |
-| **Stream Engine & State** | Basic Python script / Kafka consumer. | Apache Flink with RocksDB state checkpointing. | Flink with custom credit-based flow control and partition lag telemetry. |
-| **Error & Bottleneck Handling** | Basic `try/except` or crashes on 429. | Exponential retry backoff with jitter + Dead-Letter Queue (DLQ). | Circuit breakers, graceful traffic shedding, and failover fallback models. |
-| **Traffic Prioritization** | All events mixed in a single topic. | Increases consumer pods via HPA. | **Dual Priority Tiers**:<br>Separates real-time VIP agent streams from bulk background sync. |
-| **Model Upgrade Strategy** | Drops index and re-indexes from scratch (hours of downtime). | Builds new index in background, then switches DNS/alias pointer. | **Zero-Downtime Dual-Writing & Shadow Convergence**: Writes real-time CDC to both versions while backfilling. |
-| **FinOps & Cost Mindset** | "Does the pipeline process records?" | "Is the pipeline fast and fault-tolerant?" | **"How do we minimize GPU compute cost and protect the system against cascading outages?"** |
+### 1. Ingestion & Calling Strategy
+* **L4 (Mid-Level):** 1-by-1 synchronous HTTP calls.
+* **L5 (Senior):** Micro-batches (128–256 docs per request).
+* **L6 (Staff):** Dynamic micro-batching + connection pooling + asynchronous I/O.
+
+### 2. Redundant Update Handling (FinOps)
+* **L4 (Mid-Level):** Re-embeds every single update blindly.
+* **L5 (Senior):** Re-embeds every update in batches.
+* **L6 (Staff):** **Content-Hash Deduplication Gate** (calculates `SHA-256(text)`; skips GPU embedding if text is unchanged, saving ~80% GPU cost).
+
+### 3. Stream Engine & State Store
+* **L4 (Mid-Level):** Basic Python script / Kafka consumer.
+* **L5 (Senior):** Apache Flink with RocksDB state checkpointing.
+* **L6 (Staff):** Flink with credit-based flow control and partition lag telemetry.
+
+### 4. Error & Bottleneck Handling
+* **L4 (Mid-Level):** Basic `try/except` or crashes on 429.
+* **L5 (Senior):** Exponential retry backoff with jitter + Dead-Letter Queue (DLQ).
+* **L6 (Staff):** Circuit breakers, graceful traffic shedding, and failover models.
+
+### 5. Traffic Prioritization & Isolation
+* **L4 (Mid-Level):** All events mixed in a single topic.
+* **L5 (Senior):** Increases consumer pods via HPA.
+* **L6 (Staff):** **Dual Priority Tiers** (separates real-time VIP agent streams from bulk background sync).
+
+### 6. Model Upgrade Strategy
+* **L4 (Mid-Level):** Drops index and re-indexes from scratch (hours of downtime).
+* **L5 (Senior):** Builds new index in background, then switches DNS/alias pointer.
+* **L6 (Staff):** **Zero-Downtime Dual-Writing & Shadow Convergence** (writes real-time CDC to both versions while backfilling).
 
 ---
 
 ## 4. FinOps Impact Analysis: The Cost of Architecture
 
-Let us calculate the financial impact of each engineering design at enterprise scale (15,000 events/sec, where 80% are metadata-only updates):
+Financial impact of each engineering design at enterprise scale (15,000 events/sec, where 80% are metadata-only updates):
 
-```
-+-----------------------------------------------------------------------------------------------+
-|                                FINOPS COST & CAPACITY COMPARISON                              |
-+------------------+----------------------------------+--------------------+--------------------+
-| Level            | GPU Requests / Sec              | Required Hardware  | Estimated Cost/Mo  |
-+------------------+----------------------------------+--------------------+--------------------+
-| L4 (Mid-Level)   | 15,000 calls/sec (Unbatched)     | System crashes     | N/A (Outage)       |
-| L5 (Senior)      | 15,000 docs/sec (Batched)        | ~16x H100 GPUs     | ~$45,000 / month   |
-| L6 (Staff)       | 3,000 docs/sec (Deduplicated)    | ~4x H100 GPUs      | ~$11,000 / month   |
-+------------------+----------------------------------+--------------------+--------------------+
-| FINANCIAL SAVINGS: L6 Staff Architecture saves ~$34,000/month ($408,000/year) in GPU compute! |
-+-----------------------------------------------------------------------------------------------+
-```
+| Level | Ingestion Load | Required Hardware | Estimated Cost/Mo |
+| :--- | :--- | :--- | :--- |
+| **L4 (Mid-Level)** | 15,000 calls/sec (Unbatched) | System crashes | **N/A (Outage)** |
+| **L5 (Senior)** | 15,000 docs/sec (Batched) | ~16x H100 GPUs | **~$45,000 / mo** |
+| **L6 (Staff)** | 3,000 docs/sec (Deduplicated)| ~4x H100 GPUs | **~$11,000 / mo** |
+
+> **Financial Impact:** The L6 Staff Architecture saves **~$34,000/month ($408,000/year)** in GPU compute!
 
 ---
 

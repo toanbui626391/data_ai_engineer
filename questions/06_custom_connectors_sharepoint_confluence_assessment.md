@@ -10,32 +10,35 @@
 
 When candidates claim on their resumes that they *"designed and built custom connectors to ingest SharePoint and Confluence data into a Data Lakehouse"*, use this rubric to distinguish script wrappers from true distributed systems engineers.
 
-```
-┌─────────────────┬───────────────────────────────────┬───────────────────────────────────┬───────────────────────────────────┐
-│ Evaluation Area │ L4 (Junior / Mid Data Engineer)   │ L5 (Senior Data Engineer)         │ L6 (Staff / Principal Engineer)   │
-├─────────────────┼───────────────────────────────────┼───────────────────────────────────┼───────────────────────────────────┤
-│ Architectural   │ Reinvents the wheel without       │ Identifies specific platform gaps │ Knows precise technical & legal   │
-│ Justification   │ knowing prebuilt tools exist.     │ (e.g. 100MB limits, ACLs for RAG).│ boundaries (cost, DLP, VPC, ACLs).│
-├─────────────────┼───────────────────────────────────┼───────────────────────────────────┼───────────────────────────────────┤
-│ SharePoint Sync │ Recursive folder traversal with   │ Microsoft Graph `/delta` queries; │ Delta Link state machine with     │
-│ Strategy        │ `os.walk` or simple GET loops.    │ stores delta tokens in database.  │ HTTP 410 self-healing baselines.  │
-├─────────────────┼───────────────────────────────────┼───────────────────────────────────┼───────────────────────────────────┤
-│ Memory & Buffer │ `response.content` in RAM or      │ Temp files on disk (`/tmp`) with  │ Zero-RAM chunked streaming direct │
-│ Management      │ loading entire binary in memory.  │ multi-part S3 uploads.            │ to S3 (`upload_fileobj`/raw stream│
-├─────────────────┼───────────────────────────────────┼───────────────────────────────────┼───────────────────────────────────┤
-│ Rate Limiting   │ Naive `time.sleep()` or unhandled │ Basic exponential backoff on 429  │ Token-bucket rate limiter + full  │
-│ (HTTP 429)      │ crashes on Graph/Atlassian limits.│ with `Retry-After` header parsing.│ jitter + proactive capacity pool. │
-├─────────────────┼───────────────────────────────────┼───────────────────────────────────┼───────────────────────────────────┤
-│ Security & ACLs │ Ignored; ingests files only       │ Basic user email permissions      │ Extracts Entra ID SIDs / groups & │
-│ (Governance)    │ without access control metadata.  │ captured in separate table.       │ builds permission bitmap for RAG. │
-├─────────────────┼───────────────────────────────────┼───────────────────────────────────┼───────────────────────────────────┤
-│ Confluence Body │ Naive text extraction or plain    │ Ingests Storage XHTML; basic      │ Ingests Storage XHTML + ADF JSON; │
-│ Parsing         │ HTML tags dumped as string.       │ macro stripping via regex/parser. │ strips UI macros, keeps hierarchy.│
-├─────────────────┼───────────────────────────────────┼───────────────────────────────────┼───────────────────────────────────┤
-│ Idempotency &   │ Blind overwrites on every run;    │ Checks modified timestamps before │ ETag / version cache gates before │
-│ FinOps          │ re-downloads millions of files.   │ invoking download streams.        │ network call; zero-waste compute. │
-└─────────────────┴───────────────────────────────────┴───────────────────────────────────┴───────────────────────────────────┘
-```
+### 1. Architectural Justification
+* **L4 (Junior/Mid):** Reinvents the wheel without knowing prebuilt tools exist.
+* **L5 (Senior):** Identifies specific platform gaps (e.g., 100 MB file limits, missing ACLs for RAG).
+* **L6 (Staff):** Knows precise technical, financial, and compliance boundaries (FinOps, DLP, on-prem VPC, Entra ID SIDs).
+
+### 2. SharePoint Ingestion Strategy
+* **L4 (Junior/Mid):** Recursive folder traversal with `os.walk` or simple GET loops.
+* **L5 (Senior):** Microsoft Graph `/delta` queries; stores delta tokens in a persistent database.
+* **L6 (Staff):** Delta Link state machine with automated `HTTP 410 Gone` self-healing baseline crawls.
+
+### 3. Memory & Buffer Safety
+* **L4 (Junior/Mid):** `response.content` in RAM or loading entire binary into memory (OOM crash on >100 MB).
+* **L5 (Senior):** Temp files on local disk (`/tmp`) with multipart S3 uploads.
+* **L6 (Staff):** Zero-RAM chunked streaming direct to S3 (`upload_fileobj` streaming `response.raw`).
+
+### 4. Rate Limiting & Backoff (HTTP 429)
+* **L4 (Junior/Mid):** Naive `time.sleep()` or unhandled crashes on Graph/Atlassian limits.
+* **L5 (Senior):** Basic exponential backoff on 429 with `Retry-After` header parsing.
+* **L6 (Staff):** Token-bucket rate limiter + full randomized jitter + proactive capacity pooling.
+
+### 5. Security & Governance (ACLs)
+* **L4 (Junior/Mid):** Ignored; ingests files only without access control metadata.
+* **L5 (Senior):** Basic user email permissions captured in a separate table.
+* **L6 (Staff):** Extracts Entra ID SIDs / groups and builds permission bitmaps for downstream RAG security trimming.
+
+### 6. Idempotency & FinOps
+* **L4 (Junior/Mid):** Blind overwrites on every run; re-downloads millions of unchanged files.
+* **L5 (Senior):** Checks modified timestamps before invoking download streams.
+* **L6 (Staff):** Pre-download ETag & version cache gates; skips unchanged files in <1ms (zero-waste compute).
 
 ---
 
@@ -288,19 +291,12 @@ Give the candidate this prompt on a whiteboard or live coding session:
 
 ## 7. Interviewer Evaluation Scorecard
 
-```
-+-----------------------------------------------------------------------------------------------+
-|                                CANDIDATE EVALUATION SCORECARD                                 |
-+--------------------------+-------+------------------------------------------------------------+
-| Technical Competency     | Score | Evaluation Criteria                                        |
-+--------------------------+-------+------------------------------------------------------------+
-| 1. Build vs Buy Logic    | / 15  | Articulates why custom is needed (ACLs, 100MB, on-prem,DLP)|
-| 2. API Protocol Mastery  | / 20  | Deep knowledge of Graph Delta queries, ADF/XHTML, HTTP 410 |
-| 3. Memory & I/O Safety   | / 20  | Zero-RAM chunked streaming; no memory buffer blowups       |
-| 4. Concurrency & Rate    | / 15  | Token-bucket limiting; exponential backoff + full jitter   |
-| 5. Security Trimming     | / 15  | Extracts Entra ID SIDs & Confluence user/group ACLs        |
-| 6. State & Idempotency   | / 15  | Deterministic keys, ETag caching, atomic checkpoint commits|
-+--------------------------+-------+------------------------------------------------------------+
-| TOTAL SCORE              | / 100 | ≥ 85: Strong Hire (Staff) | 70-84: Hire (Senior) | < 70: No|
-+--------------------------+-------+------------------------------------------------------------+
-```
+| Technical Competency | Score | Evaluation Criteria |
+| :--- | :--- | :--- |
+| **1. Build vs. Buy Logic** | / 15 | Articulates why custom is needed (ACLs, 100MB, on-prem, DLP) |
+| **2. API Protocol Mastery** | / 20 | Deep knowledge of Graph Delta queries, ADF/XHTML, HTTP 410 |
+| **3. Memory & I/O Safety** | / 20 | Zero-RAM chunked streaming; no memory buffer blowups |
+| **4. Concurrency & Rate** | / 15 | Token-bucket limiting; exponential backoff + full jitter |
+| **5. Security Trimming** | / 15 | Extracts Entra ID SIDs & Confluence user/group ACLs |
+| **6. State & Idempotency** | / 15 | Deterministic keys, ETag caching, atomic checkpoint commits |
+| **TOTAL SCORE** | **/ 100** | **≥ 85:** Strong Hire (Staff) \| **70–84:** Hire (Senior) \| **< 70:** No |

@@ -12,49 +12,25 @@
 
 Operating a real-time vector embedding and indexing pipeline at **15,000 events/second** introduces severe distributed systems bottlenecks. The 12 most fatal production failure modes are:
 
-```
-┌────────────────────────────────────────────────────────────────────────────────────────────────────────┐
-│                                 12 MAJOR PRODUCTION FAILURE MODES IN VECTOR INGESTION                  │
-├──────┬───────────────────────────────┬─────────────────────────────────────────────────────────────────┤
-│ CAT  │ FAILURE MODE                  │ ROOT CAUSE & CATASTROPHIC IMPACT                                │
-├──────┼───────────────────────────────┼─────────────────────────────────────────────────────────────────┤
-│      │ 1. Poison Pill Records        │ Malformed JSON, corrupted bytes, or null required keys trigger  │
-│      │                               │ unhandled exceptions, causing infinite TaskManager crash loops. │
-│ DATA ├───────────────────────────────┼─────────────────────────────────────────────────────────────────┤
-│ INGEST│ 2. Upstream Schema Drift      │ Unannounced column renames or type modifications break schema   │
-│      │                               │ parsers, halting the entire streaming DAG.                      │
-│      ├───────────────────────────────┼─────────────────────────────────────────────────────────────────┤
-│      │ 3. Out-of-Order CDC Events    │ Network latency causes an older `UPDATE` to arrive after a       │
-│      │    & Race Conditions          │ `DELETE` or newer `UPDATE`, causing stale data overwrite.       │
-│      ├───────────────────────────────┼─────────────────────────────────────────────────────────────────┤
-│      │ 4. Head-of-Line Blocking      │ Bulk DB sync floods a single topic, starving urgent live agent  │
-│      │    (Priority Inversion)       │ ticket embeddings by hours.                                     │
-├──────┼───────────────────────────────┼─────────────────────────────────────────────────────────────────┤
-│      │ 5. False Cache Misses         │ Trivial formatting jitter (\r\n vs \n, Unicode NFD, HTML tags)  │
-│ DEDUP│    (Formatting Jitter)        │ breaks naive hashes, causing ~$34k/mo in redundant GPU compute. │
-│  &   ├───────────────────────────────┼─────────────────────────────────────────────────────────────────┤
-│ STATE│ 6. False Positives / Desync   │ Naive Bloom Filters incorrectly flag changed docs as unchanged, │
-│      │    (Bloom Filter Fallacy)     │ permanently corrupting and desynchronizing the Vector DB.       │
-│      ├───────────────────────────────┼─────────────────────────────────────────────────────────────────┤
-│      │ 7. Worker Crash Desync        │ Pod crash loses uncheckpointed in-memory hash state, causing     │
-│      │                               │ massive duplicate re-embedding storms upon recovery.            │
-├──────┼───────────────────────────────┼─────────────────────────────────────────────────────────────────┤
-│      │ 8. GPU Inference Meltdown     │ Unbatched HTTP requests trigger 429/503 rate-limits, consumer   │
-│ GPU  │    (429/503 Cascades)         │ lag explosion, and TaskManager Out-Of-Memory (OOM) crashes.     │
-│ INFER├───────────────────────────────┼─────────────────────────────────────────────────────────────────┤
-│      │ 9. Straggler GPU Workers      │ Hardware degradation on a subset of GPU pods causes queue       │
-│      │                               │ imbalances without upstream credit-based backpressure.          │
-├──────┼───────────────────────────────┼─────────────────────────────────────────────────────────────────┤
-│      │ 10. Vector DB Write Buffer    │ High ingestion QPS saturates Vector DB write WAL, exhausting    │
-│STORE │     Exhaustion                │ client connection pools and failing upserts.                    │
-│  &   ├───────────────────────────────┼─────────────────────────────────────────────────────────────────┤
-│ MIG  │ 11. Model Migration Downtime  │ Upgrading embedding models (1536d → 1024d) forces full DB drops, │
-│      │                               │ causing search outages or degraded recall for active agents.    │
-│      ├───────────────────────────────┼─────────────────────────────────────────────────────────────────┤
-│      │ 12. GDPR Deletion SLA Breach  │ Failure to propagate tombstones across Vector DB, Shadow Index, │
-│      │                               │ and Iceberg tables within 60 seconds violates compliance.       │
-└──────┴───────────────────────────────┴─────────────────────────────────────────────────────────────────┘
-```
+### 1. Ingestion & Contract Bottlenecks
+* **1. Poison Pill Records:** Malformed JSON, corrupted bytes, or null required keys trigger unhandled exceptions, causing infinite TaskManager crash loops.
+* **2. Upstream Schema Drift:** Unannounced column renames or type modifications break schema parsers, halting the entire streaming DAG.
+* **3. Out-of-Order CDC Events:** Network latency causes an older `UPDATE` to arrive after a `DELETE` or newer `UPDATE`, causing stale data overwrite.
+* **4. Head-of-Line Blocking:** Bulk DB backfill floods a single topic, starving urgent live agent ticket embeddings by hours.
+
+### 2. Deduplication & State Bottlenecks
+* **5. False Cache Misses:** Trivial formatting jitter (`\r\n` vs `\n`, Unicode NFD, HTML tags) breaks naive hashes, wasting ~$34k/mo in redundant GPU compute.
+* **6. False Positives / Desync:** Naive Bloom filters incorrectly flag changed docs as unchanged, permanently corrupting and desynchronizing the Vector DB.
+* **7. Worker Crash Desync:** Pod crash loses uncheckpointed in-memory hash state, causing massive duplicate re-embedding storms upon recovery.
+
+### 3. GPU Inference Bottlenecks
+* **8. GPU Inference Meltdown:** Unbatched HTTP requests trigger 429/503 rate-limits, consumer lag explosion, and TaskManager OOM crashes.
+* **9. Straggler GPU Workers:** Hardware degradation on a subset of GPU pods causes queue imbalances without credit-based backpressure.
+
+### 4. Storage, Migration & Compliance Bottlenecks
+* **10. Vector DB Write Buffer Exhaustion:** High ingestion QPS saturates Vector DB write WAL, exhausting connection pools and failing upserts.
+* **11. Model Migration Downtime:** Upgrading embedding models (1536d $\to$ 1024d) forces full DB drops, causing search outages or degraded recall.
+* **12. GDPR Deletion SLA Breach:** Failure to propagate tombstones across Vector DB, Shadow Index, and Iceberg within 60s violates compliance.
 
 ---
 
@@ -187,20 +163,25 @@ flowchart TD
 
 ## 3. How the Architecture Handles Each Production Problem
 
-| # | Production Problem | Architecture Component | How the Architecture Neutralizes the Issue |
-|---|---|---|---|
-| **1** | **Poison Pill Records** | **Flink Non-Blocking Side-Output (`OutputTag`)** | Malformed JSON or null fields are caught in `ProcessFunction`, tagged with error metadata, and routed to an Iceberg Quarantine table. **Zero task crashes; zero downtime for valid records.** |
-| **2** | **Upstream Schema Drift** | **Schema Registry + Iceberg Field-ID Tracking** | Enforces `BACKWARD_TRANSITIVE` producer contracts. Iceberg maps columns by immutable numeric Field IDs, allowing renames, additions, and type promotions without table rewrites or streaming restarts. |
-| **3** | **Out-of-Order CDC Events** | **RocksDB Version Watermarking** | RocksDB stores `(doc_id) → {hash, event_timestamp, lsn}`. If an event arrives with `event_timestamp < last_stored_timestamp`, it is identified as a stale out-of-order replay and discarded. |
-| **4** | **Head-of-Line Blocking** | **Dual-Priority Kafka Topics (VIP vs Bulk)** | Live agent queries and high-priority tickets are isolated in a dedicated VIP topic with dedicated consumer threads, ensuring sub-second ingestion even during a 50M-doc Confluence backfill. |
-| **5** | **Formatting Cache Misses** | **Pre-Hash Canonical Normalization Pipeline** | Standardizes text before hashing: Unicode NFC normalization, `\r\n` stripping, whitespace trimming, and HTML entity decoding. Eliminates false cache misses, saving ~$34k/mo. |
-| **6** | **Bloom Filter Desynchronization** | **Exact KV State in RocksDB (No Bloom Filters)** | Replaces probabilistic Bloom filters with exact Key-Value storage (`doc_id → hash`). Guarantees zero false positives (no missed document updates) and supports seamless key updates/deletions. |
-| **7** | **Worker Crash Desync** | **RocksDB Incremental Checkpointing to S3** | State is flushed asynchronously to S3/GCS every 1–3 minutes. If a worker pod crashes, the replacement recovers the exact hash state, preventing re-embedding storms or Vector DB double-writes. |
-| **8** | **GPU Inference Meltdown** | **Credit-Based Backpressure + Dynamic Batching** | Flink's flow controller monitors Triton queue depth. When full, Flink withholds network credits from upstream Kafka consumers, naturally pausing ingestion without memory leaks or 429 crashes. |
-| **9** | **Straggler GPU Workers** | **Asynchronous I/O with Circuit Breakers** | Flink `AsyncDataStream` distributes requests across GPU workers with exponential backoff + jitter. If a GPU pod fails consistently, a circuit breaker trips and redirects traffic to healthy pods. |
-| **10** | **Vector DB Buffer Full** | **Downstream Flow Throttling & WAL Spillover** | Flink treats Vector DB response latencies as backpressure signals. If vector index write buffers fill, ingestion slows down gracefully rather than dropping unindexed records. |
-| **11** | **Model Migration Downtime** | **Dual-Writing & Shadow Index Convergence** | Writes real-time CDC updates to both `v1` (1536d) and `v2` (1024d) while backfilling historical records from Iceberg. Once shadow index lag reaches 0, atomically swaps the search alias pointer with **zero downtime**. |
-| **12** | **GDPR Deletion SLA Breach** | **VIP Tombstone Fast-Path** | CDC delete events bypass the deduplication gate, issuing immediate `delete(doc_id)` commands to both Active/Shadow vector indexes, purging RocksDB state, and logging tombstones in Iceberg within < 60s. |
+### Tier 1: Ingestion & Schema Gate
+* **1. Poison Pill Records:** Caught in Flink `ProcessFunction` and routed to an Iceberg Quarantine table via non-blocking side-outputs (`OutputTag`). Zero TaskManager crashes.
+* **2. Upstream Schema Drift:** Schema Registry enforces backward contracts; Iceberg maps columns by immutable numeric Field IDs, allowing renames/additions without restarts.
+* **3. Out-of-Order CDC Events:** RocksDB stores `(doc_id) → {hash, event_timestamp, lsn}`. Stale events with older timestamps are dropped immediately.
+* **4. Head-of-Line Blocking:** Isolated into Dual-Priority Kafka topics (VIP agent chat vs. Bulk backfill), guaranteeing sub-second latency for live queries.
+
+### Tier 2: Deduplication & Version Ordering
+* **5. Formatting Cache Misses:** Standardizes text (Unicode NFC, strip `\r\n`, HTML decode) before hashing with xxHash64, saving ~$34k/mo.
+* **6. Bloom Filter Desync:** Uses exact Key-Value state in local RocksDB (no probabilistic Bloom filters), guaranteeing zero false positives.
+* **7. Worker Crash Desync:** RocksDB state is checkpointed asynchronously to S3/GCS every 1–3 minutes, recovering exact state without duplicate storms.
+
+### Tier 3: Flow Control & High-Density GPU Serving
+* **8. GPU Inference Meltdown:** Credit-based backpressure in Flink pauses Kafka partition consumption when Triton queues fill up.
+* **9. Straggler GPU Workers:** Asynchronous I/O with circuit breakers and exponential backoff redirects traffic away from degraded pods.
+* **10. Vector DB Buffer Full:** Vector DB write latency serves as a backpressure signal to slow ingestion gracefully without data loss.
+
+### Tier 4: Storage, Migration & Compliance
+* **11. Model Migration Downtime:** Dual-writes live CDC to both v1 (1536d) and v2 (1024d) while backfilling. Swaps search alias with zero downtime.
+* **12. GDPR Deletion SLA Breach:** VIP Tombstone fast-path purges Vector DB, clears RocksDB state, and appends deletes in Iceberg in <60s.
 
 ---
 
@@ -367,19 +348,13 @@ While Python-native tools (like Bytewax or Quix Streams) are increasingly popula
 
 At enterprise scale (**15,000 events/sec**, where 80% are metadata-only changes):
 
-```
-+-----------------------------------------------------------------------------------------------+
-|                                FINOPS COST & CAPACITY COMPARISON                              |
-+------------------+----------------------------------+--------------------+--------------------+
-| Level            | GPU Requests / Sec              | Required Hardware  | Estimated Cost/Mo  |
-+------------------+----------------------------------+--------------------+--------------------+
-| L4 (Mid-Level)   | 15,000 calls/sec (Unbatched)     | System crashes     | N/A (Outage)       |
-| L5 (Senior)      | 15,000 docs/sec (Batched)        | ~16x H100 GPUs     | ~$45,000 / month   |
-| L6 (Staff - Us)  | 3,000 docs/sec (Deduplicated)    | ~4x H100 GPUs      | ~$11,000 / month   |
-+------------------+----------------------------------+--------------------+--------------------+
-| FINANCIAL SAVINGS: Staff L6 Architecture saves ~$34,000/month ($408,000/year) in GPU compute! |
-+-----------------------------------------------------------------------------------------------+
-```
+| Level | Ingestion Load | Required Hardware | Estimated Cost/Mo |
+| :--- | :--- | :--- | :--- |
+| **L4 (Mid-Level)** | 15,000 calls/sec (Unbatched) | System crashes | **N/A (Outage)** |
+| **L5 (Senior)** | 15,000 docs/sec (Batched) | ~16x H100 GPUs | **~$45,000 / mo** |
+| **L6 (Staff - Us)** | 3,000 docs/sec (Deduplicated) | ~4x H100 GPUs | **~$11,000 / mo** |
+
+> **Financial Impact:** Staff L6 Architecture saves **~$34,000/month ($408,000/year)** in GPU compute!
 
 ---
 

@@ -19,20 +19,8 @@ This directory contains a comprehensive, production-grade interview framework an
 
 ## 🎯 Candidate Leveling Quick Reference
 
-```
-+----------------------------------------------------------------------------------------------------+
-|                                    CANDIDATE LEVELING SPECTRUM                                     |
-+----------------------------------------------------------------------------------------------------+
-|  Junior / Mid-Level (L3/L4)  |  - Relies on default tutorial stacks (LangChain defaults, ChromaDB) |
-|                              |  - Unaware of distributed data bottlenecks and vector RAM overhead |
-+------------------------------+---------------------------------------------------------------------+
-|  Senior Engineer (L4 / L5)   |  - Strong execution, clean PySpark/Flink/Python streaming code     |
-|                              |  - Component-level design, deterministic pipelines, error handling  |
-|                              |  - Understands hybrid search, embedding batching, and schema typing |
-+------------------------------+---------------------------------------------------------------------+
-|  Staff Engineer (L6+)        |  - End-to-end distributed system architecture and trade-off mastery |
-|                              |  - Zero-downtime model migrations, multi-agent memory hierarchies    |
-|                              |  - FinOps cost modeling (RAM vs NVMe), zero-trust security & ACLs   |
-|                              |  - Defines enterprise data contracts and mentors team leads         |
-+----------------------------------------------------------------------------------------------------+
-```
+| Level | Profile & Focus Area |
+| :--- | :--- |
+| **Junior / Mid (L3/L4)** | • Relies on tutorial defaults (LangChain, ChromaDB)<br/>• Unaware of distributed data bottlenecks and RAM limits |
+| **Senior (L4/L5)** | • Strong execution in PySpark / Python streaming<br/>• Deterministic component pipelines, error handling & retries<br/>• Understands hybrid search, batching, and schema types |
+| **Staff (L6+)** | • End-to-end distributed system architecture & trade-offs<br/>• Zero-downtime model migrations & memory hierarchies<br/>• FinOps cost modeling (RAM vs. NVMe) & zero-trust ACLs<br/>• Defines data contracts and leads cross-team architecture |

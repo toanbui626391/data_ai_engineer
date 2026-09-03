@@ -57,6 +57,22 @@ flowchart LR
 * **Data Contracts as Code:** Ingress contracts enforced via semantic versioning (Protobuf, Avro, JSON Schema). Schema mismatches never crash core pipelines; they route to non-blocking Dead-Letter Queues (DLQ) or quarantine tables.
 * **Federated Governance:** Centralized policy definition (IAM, classification, encryption) with decentralized execution across domain workspaces.
 
+### 4. Data Observability & Ingestion Circuit Breaking (The 5 Pillars of Data Health)
+Silent data corruption (semantic drift, volume drops, null spikes) is far more dangerous than pipeline crashes. Production pipelines must enforce automated data health sentries across five pillars:
+1. **Freshness (SLA Tracking):** Monitor ingestion lag against defined SLA boundaries. Alert when delta timestamp lag exceeds thresholds before downstream consumers read stale data.
+2. **Volume (Anomaly Detection):** Compute rolling 14-day median volume baselines. Unexpected swings (&gt;30% drop or &gt;100% surge) trigger non-blocking quarantine or pipeline pausing.
+3. **Schema (Strict Evolution):** Schema validation at boundary edges. Reject unannounced field removals or non-promotable type alterations.
+4. **Distribution (Drift & Null Checks):** Enforce strict 0% null tolerance on critical foreign/primary keys. Compute continuous categorical entropy and numerical distribution shifts (z-score, KS-test).
+5. **Cascading Pipeline Circuit Breaker:** If Bronze-to-Silver quality checks fail, the pipeline trips a circuit breaker and automatically halts Silver-to-Gold aggregation. Never publish tainted data to downstream executive dashboards, analytics users, or AI feature stores.
+
+### 5. Real-Time Feature Stores & Training-Serving Skew Prevention
+Production Machine Learning and predictive AI systems require synchronized online and offline feature representation:
+* **Dual-Tier Feature Store Architecture:**
+  - *Online Store (Low Latency):* Redis or Amazon DynamoDB powering real-time inference with sub-10ms point lookups.
+  - *Offline Store (Scale & Time Travel):* Apache Iceberg or Delta Lake tables in object storage storing years of feature values.
+* **Point-in-Time Correctness (AS-OF Joins):** Offline feature extraction for model training must use exact historical timestamps to prevent "future-data leakage" (accidentally using label-time features during training).
+* **Continuous Feature Drift Monitoring:** Compute Population Stability Index (PSI) and Wasserstein Distance daily between online inference feature payloads and offline training distributions. Alert when PSI &gt; 0.2 (indicating significant population drift requiring model retraining).
+
 ---
 
 ## 3. Enterprise AI & Autonomous Agent Architecture
@@ -131,6 +147,49 @@ Every enterprise agent architecture must partition memory into 4 decoupled tiers
 * **Sandboxed Execution:** Tool execution occurs inside isolated microVMs, WebAssembly (Wasm) runtimes, or network-isolated containers (gVisor).
 * **Circuit Breakers & Token-Bucket Rate Limiting:** External API tool calls must be bounded by token buckets to prevent infinite recursion storms.
 
+### 6. Human-in-the-Loop (HITL) & Tiered Action Risk Governance
+Autonomous agents in production must never execute unconstrained mutations against high-value enterprise assets. Actions must be classified into a 3-tier risk governance model:
+* **Tier 1 (Idempotent / Read-Only):** Safe queries, search retrieval, data formatting $\to$ **Automated Execution** within sandbox.
+* **Tier 2 (Low-Risk Reversible Mutations):** Draft creation, staging writes, tagging $\to$ **Automated Execution with Audit Trail** and automated rollback snapshots.
+* **Tier 3 (High-Risk / Irreversible Mutations):** Financial transactions, database drops, cloud IAM privilege grants, customer-facing emails $\to$ **Mandatory HITL Approval Pause**.
+  - *Durable State Machine Pause:* The orchestration engine (Temporal / LangGraph) commits state to durable storage and suspends the trajectory.
+  - *Async Notification:* Dispatches interactive webhook (Slack, Microsoft Teams, or custom admin UI) with the proposed action payload, estimated impact, and explicit Approve/Reject buttons.
+  - *Timeout SLA:* Enforces a strict expiration window (e.g., 2 hours). Unapproved actions automatically abort to a safe terminal state.
+
+### 7. Vector Index Lifecycle & Zero-Downtime Migration (Blue/Green Indexing)
+Embedding models have non-transferable, incompatible vector spaces. Upgrading from an older embedding model (e.g., `ada-002`) to a modern model (e.g., `text-embedding-3-large` or fine-tuned ColBERT) requires complete re-indexing. Enterprise AI architectures must enforce a zero-downtime **Blue/Green Index Migration Protocol**:
+
+```mermaid
+flowchart LR
+    %% ── Universal Contrast Palette (Light & Dark Mode Safe) ──
+    classDef default fill:#1e293b,stroke:#38bdf8,stroke-width:1.5px,color:#f8fafc;
+    classDef storage fill:#0f172a,stroke:#818cf8,stroke-width:2px,color:#f8fafc;
+    classDef decision fill:#451a03,stroke:#fbbf24,stroke-width:2px,color:#fffbeb;
+    classDef success fill:#064e3b,stroke:#34d399,stroke-width:2px,color:#ecfdf5;
+
+    Client["RAG Query Client"]:::default -->|"Active Alias Pointing to Blue"| Blue["Index Blue (v1 Model)<br/>[Serving Live Traffic]"]:::storage
+    
+    subgraph Migration ["Zero-Downtime Re-indexing"]
+        ShadowStream["Dual-Write Ingestion Stream"]:::default --> Blue
+        ShadowStream --> Green["Index Green (v2 Model)<br/>[Backfilling Corpus]"]:::storage
+        Green --> EvalGate{"Golden Eval Gate<br/>(MRR@10 &gt;= Blue &amp; Latency SLA)"}:::decision
+        EvalGate -->|"Passed"| Cutover["Atomic Alias Cutover<br/>(alias:kb_prod -> Green)"]:::success
+    end
+```
+
+1. **Virtual Alias Indirection:** Clients must never query raw physical index names. Queries route to a logical alias: `alias:kb_production -> index_blue_v1`.
+2. **Dual-Write Shadow Streaming:** During the migration window, real-time ingestion streams dual-write updates to both `index_blue_v1` and `index_green_v2`.
+3. **Background Historical Backfill:** Distributed batch workers re-embed the historical lakehouse corpus into `index_green_v2`.
+4. **Golden Dataset Benchmark:** Run automated evals over a curated benchmark of 500+ golden enterprise queries. Verify that Mean Reciprocal Rank (MRR@10) and NDCG@10 of Green are equal or superior to Blue.
+5. **Instant Atomic Cutover:** Repoint `alias:kb_production -> index_green_v2` in sub-milliseconds without dropping a single active query. Retain Blue in read-only standby for 72 hours for instant rollback capability.
+
+### 8. Graceful Fallback Cascades for Resilient AI Products
+Production AI products must withstand LLM provider outages (HTTP 503s), network partitions, and extreme latency spikes ($>10\text{s}$):
+* **Level 1 (Primary Model):** Managed Frontier API (Claude 3.5 Sonnet / GPT-4o).
+* **Level 2 (Cross-Cloud / Cross-Provider Failover):** If Level 1 returns 5xx or times out after 8s, fail over dynamically to an alternative cloud provider (e.g., Azure OpenAI or AWS Bedrock).
+* **Level 3 (Semantic Vector Cache):** Serve approximate historical cached answers with a clear UI disclosure banner (`"Cached response based on query similarity"`).
+* **Level 4 (Deterministic Fallback):** Fall back to traditional lexical keyword search (BM25 / Elasticsearch) and structured deterministic response templates. Never return a raw 500 error stack trace to the user.
+
 ---
 
 ## 4. LLMOps, Observability & FinOps Governance
@@ -149,6 +208,20 @@ Every enterprise agent architecture must partition memory into 4 decoupled tiers
 ### 3. Token FinOps & Semantic Caching
 * **Exact Hash Caching:** Compute SHA256 of `(model_id + temperature + system_prompt + user_prompt)`. Cache hits return in <5ms for $0.00.
 * **Semantic Vector Caching:** Check embeddings against a vector cache (Redis / Qdrant). Queries with cosine similarity $\ge 0.96$ return cached responses, saving 30–60% of LLM compute spend.
+
+### 4. Regulatory Privacy, GDPR Erasure & Lakehouse Vacuuming
+Enterprise systems must comply with GDPR Article 17 ("Right to be Forgotten") and CCPA without breaking the immutable guarantees of open lakehouses:
+* **Merge-on-Read (MoR) with Position Deletes:** Write point-deletion markers (tombstones) rather than triggering expensive, continuous full-Parquet file rewrites during user erasure requests.
+* **Scheduled Compaction & Vacuum SLA:** Run automated compaction jobs (e.g., Iceberg `rewrite_data_files` and `expire_snapshots`) on a weekly cadence to physically purge deleted Parquet chunks and purge historical snapshot metadata within statutory 30-day compliance windows.
+* **Cascading Downstream Deletion:**
+  - *Vector Stores:* Immediately apply metadata soft-delete filters (`is_deleted = true`) on user vectors to hide them from RAG queries in sub-seconds, followed by physical index segment merging.
+  - *Semantic Caches:* Invalidate all cache keys tagged with the purged user entity or document IDs.
+
+### 5. Production Deployment Patterns: Shadow Traffic & Canary Prompting
+Never deploy prompt template updates, embedding changes, or model upgrades directly to 100% of live production traffic:
+* **Shadow Traffic Mirroring:** Duplicate 10% of live user queries to the candidate agent/model asynchronously via a message bus (Kafka/EventBridge). Evaluate response quality, latency, and toxicity without impacting end users.
+* **Canary Release Progression:** Route 5% $\to$ 25% $\to$ 100% of production traffic using weighted DNS or API Gateway route splits.
+* **Automated Circuit Breaker Rollback:** Monitor live OpenTelemetry eval metrics. If user thumb-down sentiment spikes by &gt;15% or P99 latency exceeds SLA, the routing proxy rolls back to the previous stable prompt/model version within 10 seconds.
 
 ---
 

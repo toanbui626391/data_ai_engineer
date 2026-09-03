@@ -300,3 +300,68 @@ Give the candidate this prompt on a whiteboard or live coding session:
 | **5. Security Trimming** | / 15 | Extracts Entra ID SIDs & Confluence user/group ACLs |
 | **6. State & Idempotency** | / 15 | Deterministic keys, ETag caching, atomic checkpoint commits |
 | **TOTAL SCORE** | **/ 100** | **≥ 85:** Strong Hire (Staff) \| **70–84:** Hire (Senior) \| **< 70:** No |
+
+---
+
+## 8. Authoritative References & Architectural Deep-Dive
+
+This section compiles primary documentation, API specifications, and architectural references from Microsoft, Atlassian, Databricks, and AWS that justify the technical criteria in this assessment.
+
+### 8.1 Microsoft Graph & SharePoint Architecture
+
+* **Microsoft Graph Delta Query Protocol:**
+  * [driveItem: delta API Reference](https://learn.microsoft.com/en-us/graph/api/driveitem-delta) — Details the incremental query mechanics for drives and document libraries. Explains `@odata.nextLink` pagination and the terminal `@odata.deltaLink` state token.
+  * [Use Delta Query to Track Changes in Microsoft Graph Data](https://learn.microsoft.com/en-us/graph/delta-query-overview) — Comprehensive guide on state storage, delta token lifecycles, and handling `HTTP 410 Gone` (token expiration beyond tenant retention windows).
+* **Throttling, Rate Limiting & Backoff:**
+  * [Microsoft Graph Throttling Guidance](https://learn.microsoft.com/en-us/graph/throttling) — Formal specifications for `HTTP 429 Too Many Requests`, reading the `Retry-After` header, and implementing exponential backoff with full randomized jitter to prevent the thundering herd problem.
+* **Security Trimming & Permissions Extraction:**
+  * [List Permissions for a DriveItem](https://learn.microsoft.com/en-us/graph/api/driveitem-list-permissions) — Schema for the `/permissions` endpoint and `grantedToV2` object, covering Entra ID Object IDs (`group:GUID`, `user:UPN`) required for RAG security trimming.
+* **Large File & Binary Streaming:**
+  * [Download a DriveItem Content](https://learn.microsoft.com/en-us/graph/api/driveitem-get-content) — Explains the pre-authenticated `@microsoft.graph.downloadUrl` mechanism that bypasses bearer token headers and enables zero-RAM chunked streaming directly to Amazon S3 via `upload_fileobj(resp.raw)`.
+
+---
+
+### 8.2 Atlassian Confluence REST API v2 Architecture
+
+* **Confluence Cloud REST API v2 Specifications:**
+  * [Confluence Cloud REST API v2 Documentation](https://developer.atlassian.com/cloud/confluence/rest/v2/) — Official entry point for the modern v2 REST API.
+  * [Confluence Pages API v2](https://developer.atlassian.com/cloud/confluence/rest/v2/api-group-page/) — Endpoints for querying pages by space, sorting by `modified-date`, and requesting specific representations via `?body-format=storage` or `?body-format=atlas_doc_format`.
+* **Content Storage Formats & Macro Cleaning:**
+  * [Confluence Storage Format Specifications](https://confluence.atlassian.com/doc/confluence-storage-format-1026057003.html) — Technical guide to Confluence's XHTML-based XML format, custom `<ac:structured-macro>` definitions, and XML parsing requirements for text sanitization.
+* **Page Restrictions & Security Trimming:**
+  * [Page Restrictions API](https://developer.atlassian.com/cloud/confluence/rest/v2/api-group-page-restriction/) — Details how page-level read and update restrictions are queried, extracting restricted Atlassian Account IDs and group names for access-controlled indexing.
+* **Rate Limiting & Throttling (HTTP 429):**
+  * [Atlassian Cloud Rate Limiting](https://developer.atlassian.com/cloud/confluence/rate-limiting/) — Documents per-user cost-based rate limits, `HTTP 429` status codes, `Retry-After` headers (in seconds or ISO-8601 timestamps), and backoff best practices.
+
+---
+
+### 8.3 Databricks Lakeflow Connect Limitations (Official Verification)
+
+Official Databricks documentation confirms the primary production drivers for building custom pull connectors:
+
+* **SharePoint Ingestion Limits:**
+  * [Databricks Managed SharePoint Connector Reference](https://docs.databricks.com/en/ingestion/managed-connectors/sharepoint.html)
+    * **100 MB File Limit:** Official documentation explicitly states: *"When performing unstructured ingestion using BINARYFILE, the connector loads each file's content into memory as a single record. Files larger than 100 MB can cause ingestion to fail due to out-of-memory errors."* (Recommends filtering out large files via `"row_filter": "length <= 104857600"`).
+    * **No ACL Support:** The connector does not extract or ingest item-level Access Control Lists (ACLs).
+    * **No On-Premises Support:** Supports SharePoint Online only; cannot connect to SharePoint Server on-premises behind private firewalls.
+* **Confluence Ingestion Limits:**
+  * [Databricks Managed Confluence Connector Reference](https://docs.databricks.com/en/ingestion/managed-connectors/confluence.html)
+    * **Cloud Only:** Supports Confluence Cloud only (unsupported for Confluence Data Center on-premises).
+    * **No Access Restrictions:** Does not ingest page restrictions or space permissions for enterprise security trimming.
+    * **Binary Attachments:** Ingests attachment metadata, but skips actual attachment binary payloads by default.
+
+---
+
+### 8.4 Enterprise Hybrid Network & Serverless Architecture (AWS Glue & S3)
+
+When deploying custom connectors inside corporate environments to ingest from on-premises or private networks:
+
+* **AWS Glue Network Connections:**
+  * [Setting Up VPC Networking for AWS Glue](https://docs.aws.amazon.com/glue/latest/dg/setup-vpc-for-glue-access.html) — Explains the Glue `NETWORK` connection type, ENI injection into private subnets, and the mandatory self-referencing Security Group rule (`inbound: all traffic from self`).
+* **Hybrid DNS Resolution for Internal Hosts:**
+  * [Amazon Route 53 Resolver Endpoints](https://docs.aws.amazon.com/Route53/latest/DeveloperGuide/resolve-dns-inbound-outbound-endpoints.html) — Architecture for Outbound Resolver Rules forwarding private queries (`*.corp.internal`) over Direct Connect/VPN to on-premises Active Directory or BIND DNS.
+* **FinOps & Zero-Cost S3 Data Paths:**
+  * [Gateway Endpoints for Amazon S3](https://docs.aws.amazon.com/vpc/latest/privatelink/vpc-endpoints-s3.html) — Routing multi-gigabyte chunked streaming traffic directly to S3 via free gateway endpoints, bypassing NAT Gateway data processing fees ($0.045/GB).
+* **Corporate PKI Certificate Trust:**
+  * Passing custom internal root CA bundles via the `REQUESTS_CA_BUNDLE` environment variable or `--extra-files` in AWS Glue Python Shell to prevent `SSLCertVerificationError` when connecting to internal corporate endpoints.
+

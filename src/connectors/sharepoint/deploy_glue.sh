@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # ==============================================================================
-# Deploy Self-Contained SharePoint Connector to AWS Glue Python Shell
+# Deploy Modular SharePoint Connector to AWS Glue Python Shell
 # ==============================================================================
 set -euo pipefail
 
@@ -17,11 +17,19 @@ fi
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 S3_SCRIPT_URI="s3://${S3_BUCKET}/glue_scripts/sharepoint/connector.py"
+S3_MODULES_URI="s3://${S3_BUCKET}/glue_scripts/sharepoint/sharepoint_modules.zip"
 
-echo "==> 1. Uploading self-contained connector.py to ${S3_SCRIPT_URI}..."
+echo "==> 1. Packaging modular sharepoint package into ${S3_MODULES_URI}..."
+ZIP_DIR="$(mktemp -d)"
+ZIP_TMP="${ZIP_DIR}/sharepoint_modules.zip"
+(cd "${SCRIPT_DIR}/.." && zip -rq "${ZIP_TMP}" sharepoint/ -x "*.pyc" "*__pycache__*" "*.sh" "*.md")
+aws s3 cp "${ZIP_TMP}" "${S3_MODULES_URI}"
+rm -rf "${ZIP_DIR}"
+
+echo "==> 2. Uploading connector.py entrypoint to ${S3_SCRIPT_URI}..."
 aws s3 cp "${SCRIPT_DIR}/connector.py" "${S3_SCRIPT_URI}"
 
-echo "==> 2. Deploying Tier 1 (Fast-Lane Delta) Glue Job [${TIER1_JOB_NAME}] (0.0625 DPU)..."
+echo "==> 3. Deploying Tier 1 (Fast-Lane Delta) Glue Job [${TIER1_JOB_NAME}] (0.0625 DPU)..."
 if aws glue get-job --job-name "${TIER1_JOB_NAME}" >/dev/null 2>&1; then
     echo "Updating existing Tier 1 Glue Job [${TIER1_JOB_NAME}]..."
     aws glue update-job \
@@ -40,6 +48,7 @@ if aws glue get-job --job-name "${TIER1_JOB_NAME}" >/dev/null 2>&1; then
                 \"--HEAVY_FILE_THRESHOLD_BYTES\": \"524288000\",
                 \"--MAX_WORKERS\": \"4\",
                 \"--MAX_REQUESTS_PER_SEC\": \"10.0\",
+                \"--extra-py-files\": \"${S3_MODULES_URI}\",
                 \"library-set\": \"analytics\"
             },
             \"ExecutionProperty\": {
@@ -66,6 +75,7 @@ else
             \"--HEAVY_FILE_THRESHOLD_BYTES\": \"524288000\",
             \"--MAX_WORKERS\": \"4\",
             \"--MAX_REQUESTS_PER_SEC\": \"10.0\",
+            \"--extra-py-files\": \"${S3_MODULES_URI}\",
             \"library-set\": \"analytics\"
         }" \
         --execution-property "{
@@ -76,7 +86,7 @@ else
         --glue-version "3.0"
 fi
 
-echo "==> 3. Deploying Tier 2 (Heavy-Lane Bulk) Glue Job [${TIER2_JOB_NAME}] (1.0 DPU)..."
+echo "==> 4. Deploying Tier 2 (Heavy-Lane Bulk) Glue Job [${TIER2_JOB_NAME}] (1.0 DPU)..."
 if aws glue get-job --job-name "${TIER2_JOB_NAME}" >/dev/null 2>&1; then
     echo "Updating existing Tier 2 Glue Job [${TIER2_JOB_NAME}]..."
     aws glue update-job \
@@ -94,6 +104,7 @@ if aws glue get-job --job-name "${TIER2_JOB_NAME}" >/dev/null 2>&1; then
                 \"--MODE\": \"heavy_worker\",
                 \"--MAX_WORKERS\": \"8\",
                 \"--MAX_REQUESTS_PER_SEC\": \"10.0\",
+                \"--extra-py-files\": \"${S3_MODULES_URI}\",
                 \"library-set\": \"analytics\"
             },
             \"ExecutionProperty\": {
@@ -119,6 +130,7 @@ else
             \"--MODE\": \"heavy_worker\",
             \"--MAX_WORKERS\": \"8\",
             \"--MAX_REQUESTS_PER_SEC\": \"10.0\",
+            \"--extra-py-files\": \"${S3_MODULES_URI}\",
             \"library-set\": \"analytics\"
         }" \
         --execution-property "{

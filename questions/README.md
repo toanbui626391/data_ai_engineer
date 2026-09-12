@@ -14,6 +14,7 @@ This directory contains a comprehensive, production-grade interview framework an
 | [04_interviewer_evaluation_rubric_and_scorecard.md](file:///Users/toanbui/dev/data_ai_engineer/questions/04_interviewer_evaluation_rubric_and_scorecard.md) | **Scoring & Leveling Rubric** | Senior vs. Staff behavioral/technical calibration, green flags, red flags, and interview scorecard template. |
 | [05_leveling_deep_dive_ingestion_pipeline.md](file:///Users/toanbui/dev/data_ai_engineer/questions/05_leveling_deep_dive_ingestion_pipeline.md) | **Leveling Deep-Dive (L4/L5/L6)** | Visual architecture comparison with Mermaid diagrams and FinOps cost models for Scenario 1 ingestion. |
 | [06_custom_connectors_sharepoint_confluence_assessment.md](file:///Users/toanbui/dev/data_ai_engineer/questions/06_custom_connectors_sharepoint_confluence_assessment.md) | **Custom Knowledge Connectors Assessment** | Complete vetting guide for custom SharePoint & Confluence ingestion (Graph Delta queries, Zero-RAM streaming, Entra ID ACLs, 429 jitter, ADF/XHTML parsing). |
+| [07_enterprise_rag_systems_senior_principal_assessment.md](file:///Users/toanbui/dev/data_ai_engineer/questions/07_enterprise_rag_systems_senior_principal_assessment.md) | **Enterprise RAG Systems Assessment** | Deep-dive assessment for Senior & Principal Data Engineers on production-grade RAG (Layout-aware parsing, Parent-Child chunking, Hybrid BM25+Dense search, Zero-trust ACL trimming, DiskANN/Quantization FinOps, Zero-downtime model migration). |
 
 ---
 

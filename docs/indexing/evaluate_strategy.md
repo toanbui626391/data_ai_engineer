@@ -4,7 +4,8 @@
 > **Level:** Principal Data & AI Architect / Lead Evaluation Specialist  
 > **Domain:** Heavy Industrial, Aerospace, Manufacturing & Mechanical/Electrical Engineering  
 > **Evaluation Scope:** Unstructured PDFs, Scanned Blueprints, P&IDs, CAD Models, and Bill of Materials (BOM)  
-> **Applicable Rules:** Strictly conforms to [.agents/rules/data_ai_architect_persona.md](file:///.agents/rules/data_ai_architect_persona.md) and [.agents/rules/ai_data_architect_evaluator.md](file:///.agents/rules/ai_data_architect_evaluator.md)
+> **Applicable Rules:** Strictly conforms to [.agents/rules/data_ai_architect_persona.md](file:///.agents/rules/data_ai_architect_persona.md) and [.agents/rules/ai_data_architect_evaluator.md](file:///.agents/rules/ai_data_architect_evaluator.md)  
+> **Companion Documents:** [indexing_strategy.md](file:///Users/toanbui/dev/data_ai_engineer/docs/indexing/indexing_strategy.md) | [golden_benchmark_strategy.md](file:///Users/toanbui/dev/data_ai_engineer/docs/indexing/golden_benchmark_strategy.md)
 
 ---
 
@@ -89,6 +90,9 @@ $$\text{IoU} = \frac{\text{Area of Overlap}}{\text{Area of Union}} = \frac{|B_{\
 ## 3. Golden Benchmark Dataset Construction
 
 A credible engineering evaluation framework requires a curated **Golden Test Set** consisting of $(Query, Context_{GT}, Answer_{GT}, Negatives_{Hard})$ tuples.
+
+> [!NOTE]
+> For the comprehensive architectural specification on constructing, formatting, and anchoring golden datasets (including persistent semantic span resolvers and JSON schemas), refer to the dedicated guide: [golden_benchmark_strategy.md](file:///Users/toanbui/dev/data_ai_engineer/docs/indexing/golden_benchmark_strategy.md).
 
 ### 3.1. Query Taxonomy Distribution
 

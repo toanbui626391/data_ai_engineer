@@ -5,6 +5,7 @@
 > **Domain:** Heavy Industrial, Aerospace, Manufacturing & Mechanical/Electrical Engineering  
 > **Document Scope:** Native PDFs, Scanned Drawings, Blueprints/P&IDs, 2D/3D CAD Assemblies, and Bill of Materials (BOM) Parts Catalogs  
 > **Target Scale:** 25,000,000 documents (~120M vector embeddings, ~40M BOM entities), sub-100ms p95 hybrid retrieval SLA  
+> **Companion Documents:** [evaluate_strategy.md](file:///Users/toanbui/dev/data_ai_engineer/docs/indexing/evaluate_strategy.md) | [golden_benchmark_strategy.md](file:///Users/toanbui/dev/data_ai_engineer/docs/indexing/golden_benchmark_strategy.md)
 
 ---
 
